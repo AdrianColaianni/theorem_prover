@@ -20,49 +20,53 @@ impl fmt::Display for UnOperator {
 }
 
 #[allow(dead_code)]
-enum BiOperator {
+enum BiOp {
     And,
     Or,
     Xor,
+    If,
+    Iff,
 }
 
-impl fmt::Display for BiOperator {
+impl fmt::Display for BiOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self {
             Self::And => write!(f, "∧"),
             Self::Or => write!(f, "∨"),
             Self::Xor => write!(f, "⊕"),
+            Self::If => write!(f, "→"),
+            Self::Iff => write!(f, "↔"),
         }
     }
 }
 
 #[allow(dead_code)]
-enum Expression {
-    Proposition(String),
-    BinConditional(Box<(Expression, BiOperator, Expression)>),
-    UnConditional(Box<(UnOperator, Expression)>),
+enum Expr {
+    Prop(String),
+    BinCon(Box<(Expr, BiOp, Expr)>),
+    UnCon(Box<(UnOperator, Expr)>),
 }
 
-impl Expression {
+impl Expr {
     pub fn get_prepositions(&self) -> u32 {
         match &self {
-            Self::Proposition(_) => 1,
-            Self::BinConditional(sub_expr) => {
+            Self::Prop(_) => 1,
+            Self::BinCon(sub_expr) => {
                 (*sub_expr).0.get_prepositions() + (*sub_expr).2.get_prepositions()
             }
-            Self::UnConditional(sub_expr) => (*sub_expr).1.get_prepositions(),
+            Self::UnCon(sub_expr) => (*sub_expr).1.get_prepositions(),
         }
     }
     fn get_prepositions_vec(&self) -> Vec<&str> {
         let mut vec: Vec<&str> = match &self {
-            Self::Proposition(prop) => vec![prop],
-            Self::BinConditional(sub_expr) => {
+            Self::Prop(prop) => vec![prop],
+            Self::BinCon(sub_expr) => {
                 let mut vec: Vec<&str> = (*sub_expr).0.get_prepositions_vec();
                 let mut vec2: Vec<&str> = (*sub_expr).2.get_prepositions_vec();
                 vec.append(&mut vec2);
                 vec
             }
-            Self::UnConditional(sub_expr) => (*sub_expr).1.get_prepositions_vec(),
+            Self::UnCon(sub_expr) => (*sub_expr).1.get_prepositions_vec(),
         };
         vec.sort();
         vec.dedup();
@@ -70,16 +74,19 @@ impl Expression {
     }
     fn eval(&self, props: &Dict<bool>) -> bool {
         match &self {
-            Self::Proposition(prop) => props.get(prop).unwrap().to_owned(),
-            Self::BinConditional(sub_expr) => match (*sub_expr).1 {
-                BiOperator::And => (*sub_expr).0.eval(props) && (*sub_expr).2.eval(props),
-                BiOperator::Or => (*sub_expr).0.eval(props) || (*sub_expr).2.eval(props),
-                BiOperator::Xor => {
-                    ((*sub_expr).0.eval(props) || (*sub_expr).2.eval(props))
-                        && !((*sub_expr).0.eval(props) && (*sub_expr).2.eval(props))
+            Self::Prop(prop) => props.get(prop).unwrap().to_owned(),
+            Self::BinCon(sub_expr) => {
+                let left = (*sub_expr).0.eval(props);
+                let right = (*sub_expr).2.eval(props);
+                match (*sub_expr).1 {
+                    BiOp::And => left && right,
+                    BiOp::Or => left || right,
+                    BiOp::Xor => (left || right) && !(left && right),
+                    BiOp::If => !left || right,
+                    BiOp::Iff => left == right,
                 }
-            },
-            Self::UnConditional(sub_expr) => match (*sub_expr).0 {
+            }
+            Self::UnCon(sub_expr) => match (*sub_expr).0 {
                 UnOperator::Not => !(*sub_expr).1.eval(props),
             },
         }
@@ -92,13 +99,13 @@ impl Expression {
             print!("{} | ", prop);
         }
 
-        let mut truth_vec: Vec<Vec<bool>> = vec![vec![false; props.len()+1]; rows as usize];
+        let mut truth_vec: Vec<Vec<bool>> = vec![vec![false; props.len() + 1]; rows as usize];
 
         println!();
         for index in 0..rows {
             for prop_index in 0..props.len() {
-                let magic = rows/(1+prop_index);
-                truth_vec[index][prop_index] = index % magic < magic/2;
+                let magic = rows / (1 + prop_index);
+                truth_vec[index][prop_index] = index % magic < magic / 2;
             }
         }
         for index in 0..rows {
@@ -111,63 +118,52 @@ impl Expression {
         // println!("{:?}", truth_vec);
         for row in truth_vec {
             for item in row {
-                print!("{} | ", match item {
-                    true => "T",
-                    false => "F",
-                });
+                print!(
+                    "{} | ",
+                    match item {
+                        true => "T",
+                        false => "F",
+                    }
+                );
             }
             println!();
         }
     }
 }
 
-impl fmt::Display for Expression {
+impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self {
-            Self::Proposition(str) => write!(f, "{}", str),
-            Self::BinConditional(sub_expr) => {
+            Self::Prop(str) => write!(f, "{}", str),
+            Self::BinCon(sub_expr) => {
                 write!(f, "({} {} {})", (*sub_expr).0, (*sub_expr).1, (*sub_expr).2,)
             }
-            Self::UnConditional(sub_expr) => write!(f, "{}{}", (*sub_expr).0, (*sub_expr).1,),
+            Self::UnCon(sub_expr) => write!(f, "{}{}", (*sub_expr).0, (*sub_expr).1,),
         }
     }
 }
 
 fn main() {
     println!("Hello, world!");
-
-    let not_p = Expression::UnConditional(Box::new((
-        UnOperator::Not,
-        Expression::Proposition(String::from("p")),
+    let expr1 = Expr::BinCon(Box::new((
+        Expr::Prop("p".to_string()),
+        BiOp::Iff,
+        Expr::Prop("q".to_string()),
     )));
 
-    println!("{}", not_p);
+    println!("{}", expr1);
 
-    not_p.truth_table();
+    expr1.truth_table();
 
-    let q_or_p = Expression::BinConditional(Box::new((
-        Expression::Proposition(String::from("q")),
-        BiOperator::Or,
-        Expression::Proposition(String::from("p")),
+    let expr2 = Expr::BinCon(Box::new((
+        Expr::Prop("p".to_string()),
+        BiOp::If,
+        Expr::Prop("q".to_string()),
     )));
 
-    println!("{}", q_or_p);
+    println!("{}", expr2);
 
-    q_or_p.truth_table();
-
-    let q_and_p_or_r = Expression::BinConditional(Box::new((
-        Expression::BinConditional(Box::new((
-        Expression::Proposition(String::from("q")),
-        BiOperator::And,
-        Expression::Proposition(String::from("p")),
-        ))),
-        BiOperator::Or,
-        Expression::Proposition(String::from("r")),
-    )));
-
-    println!("{}", q_and_p_or_r);
-
-    q_and_p_or_r.truth_table();
+    expr2.truth_table();
 
     println!("Goodby, world!")
 }
