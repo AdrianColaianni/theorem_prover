@@ -129,9 +129,9 @@ impl Expr {
         let mut truth_vec: Vec<Vec<bool>> = vec![vec![false; props.len() + 1]; rows as usize];
 
         println!();
-        for index in 0..rows {
-            for prop_index in 0..props.len() {
-                let magic = rows / (1 + prop_index);
+        for prop_index in 0..props.len() {
+            let magic = 2_usize.pow((props.len() - prop_index) as u32);
+            for index in 0..rows {
                 truth_vec[index][prop_index] = index % magic < magic / 2;
             }
         }
@@ -209,7 +209,7 @@ fn main() {
             Expr::Prop("c".to_string()),
             Expr::Prop("d".to_string()),
             Expr::Prop("e".to_string()),
-            // Expr::Prop("f".to_string()),
+            Expr::Prop("f".to_string()),
         ]
     );
 
