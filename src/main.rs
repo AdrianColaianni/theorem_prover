@@ -7,11 +7,11 @@ use core::fmt;
 use dict::{Dict, DictIface};
 
 #[allow(dead_code)]
-enum UnOperator {
+enum UnOp {
     Not,
 }
 
-impl fmt::Display for UnOperator {
+impl fmt::Display for UnOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self {
             Self::Not => write!(f, "¬"),
@@ -43,15 +43,15 @@ impl fmt::Display for BiOp {
 #[allow(dead_code)]
 enum Expr {
     Prop(String),
-    BinCon(Box<(Expr, BiOp, Expr)>),
-    UnCon(Box<(UnOperator, Expr)>),
+    BiCon(Box<(Expr, BiOp, Expr)>),
+    UnCon(Box<(UnOp, Expr)>),
 }
 
 impl Expr {
     pub fn get_prepositions(&self) -> u32 {
         match &self {
             Self::Prop(_) => 1,
-            Self::BinCon(sub_expr) => {
+            Self::BiCon(sub_expr) => {
                 (*sub_expr).0.get_prepositions() + (*sub_expr).2.get_prepositions()
             }
             Self::UnCon(sub_expr) => (*sub_expr).1.get_prepositions(),
@@ -60,7 +60,7 @@ impl Expr {
     fn get_prepositions_vec(&self) -> Vec<&str> {
         let mut vec: Vec<&str> = match &self {
             Self::Prop(prop) => vec![prop],
-            Self::BinCon(sub_expr) => {
+            Self::BiCon(sub_expr) => {
                 let mut vec: Vec<&str> = (*sub_expr).0.get_prepositions_vec();
                 let mut vec2: Vec<&str> = (*sub_expr).2.get_prepositions_vec();
                 vec.append(&mut vec2);
@@ -75,7 +75,7 @@ impl Expr {
     fn eval(&self, props: &Dict<bool>) -> bool {
         match &self {
             Self::Prop(prop) => props.get(prop).unwrap().to_owned(),
-            Self::BinCon(sub_expr) => {
+            Self::BiCon(sub_expr) => {
                 let left = (*sub_expr).0.eval(props);
                 let right = (*sub_expr).2.eval(props);
                 match (*sub_expr).1 {
@@ -87,7 +87,7 @@ impl Expr {
                 }
             }
             Self::UnCon(sub_expr) => match (*sub_expr).0 {
-                UnOperator::Not => !(*sub_expr).1.eval(props),
+                UnOp::Not => !(*sub_expr).1.eval(props),
             },
         }
     }
@@ -135,7 +135,7 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self {
             Self::Prop(str) => write!(f, "{}", str),
-            Self::BinCon(sub_expr) => {
+            Self::BiCon(sub_expr) => {
                 write!(f, "({} {} {})", (*sub_expr).0, (*sub_expr).1, (*sub_expr).2,)
             }
             Self::UnCon(sub_expr) => write!(f, "{}{}", (*sub_expr).0, (*sub_expr).1,),
@@ -145,7 +145,7 @@ impl fmt::Display for Expr {
 
 fn main() {
     println!("Hello, world!");
-    let expr1 = Expr::BinCon(Box::new((
+    let expr1 = Expr::BiCon(Box::new((
         Expr::Prop("p".to_string()),
         BiOp::Iff,
         Expr::Prop("q".to_string()),
@@ -155,7 +155,7 @@ fn main() {
 
     expr1.truth_table();
 
-    let expr2 = Expr::BinCon(Box::new((
+    let expr2 = Expr::BiCon(Box::new((
         Expr::Prop("p".to_string()),
         BiOp::If,
         Expr::Prop("q".to_string()),
