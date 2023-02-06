@@ -4,6 +4,7 @@
  */
 
 use core::fmt;
+use std::fs::write;
 use dict::{Dict, DictIface};
 
 #[allow(dead_code)]
@@ -20,10 +21,23 @@ impl fmt::Display for UnOp {
 }
 
 #[allow(dead_code)]
-enum BiOp {
+enum MulOp {
     And,
     Or,
     Xor,
+}
+
+impl fmt::Display for MulOp {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match &self {
+            Self::And => write!(f, "∧"),
+            Self::Or => write!(f, "∨"),
+            Self::Xor => write!(f, "⊕"),
+        }
+    }
+}
+
+enum BiOp {
     If,
     Iff,
 }
@@ -31,9 +45,6 @@ enum BiOp {
 impl fmt::Display for BiOp {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self {
-            Self::And => write!(f, "∧"),
-            Self::Or => write!(f, "∨"),
-            Self::Xor => write!(f, "⊕"),
             Self::If => write!(f, "→"),
             Self::Iff => write!(f, "↔"),
         }
@@ -43,30 +54,35 @@ impl fmt::Display for BiOp {
 #[allow(dead_code)]
 enum Expr {
     Prop(String),
-    BiCon(Box<(Expr, BiOp, Expr)>),
-    UnCon(Box<(UnOp, Expr)>),
+    UnCon(UnOp, Box<Expr>),
+    BiCon(Box<Expr>, BiOp, Box<Expr>),
+    MulCon(MulOp, Vec<Expr>),
 }
 
 impl Expr {
     pub fn get_prepositions(&self) -> u32 {
         match &self {
             Self::Prop(_) => 1,
-            Self::BiCon(sub_expr) => {
-                (*sub_expr).0.get_prepositions() + (*sub_expr).2.get_prepositions()
+            Self::UnCon(_, expr) => (*expr).get_prepositions(),
+            Self::BiCon(left, _, right) => {
+                (*left).get_prepositions() + (*right).get_prepositions()
             }
-            Self::UnCon(sub_expr) => (*sub_expr).1.get_prepositions(),
+            Self::MulCon(_, exprs) => exprs.into_iter().map(|s| s.get_prepositions()).sum(),
         }
     }
     fn get_prepositions_vec(&self) -> Vec<&str> {
         let mut vec: Vec<&str> = match &self {
             Self::Prop(prop) => vec![prop],
-            Self::BiCon(sub_expr) => {
-                let mut vec: Vec<&str> = (*sub_expr).0.get_prepositions_vec();
-                let mut vec2: Vec<&str> = (*sub_expr).2.get_prepositions_vec();
+            Self::UnCon(_, expr) => (*expr).get_prepositions_vec(),
+            Self::BiCon(left, _, right) => {
+                let mut vec: Vec<&str> = (*left).get_prepositions_vec();
+                let mut vec2: Vec<&str> = (*right).get_prepositions_vec();
                 vec.append(&mut vec2);
                 vec
             }
-            Self::UnCon(sub_expr) => (*sub_expr).1.get_prepositions_vec(),
+            Self::MulCon(_, exprs) => {
+                exprs.iter().flat_map(|s| s.get_prepositions_vec()).collect()
+            }
         };
         vec.sort();
         vec.dedup();
@@ -75,19 +91,21 @@ impl Expr {
     fn eval(&self, props: &Dict<bool>) -> bool {
         match &self {
             Self::Prop(prop) => props.get(prop).unwrap().to_owned(),
-            Self::BiCon(sub_expr) => {
-                let left = (*sub_expr).0.eval(props);
-                let right = (*sub_expr).2.eval(props);
-                match (*sub_expr).1 {
-                    BiOp::And => left && right,
-                    BiOp::Or => left || right,
-                    BiOp::Xor => (left || right) && !(left && right),
+            Self::UnCon(op, expr) => match op {
+                UnOp::Not => !(*expr).eval(props),
+            },
+            Self::BiCon(left, op, right) => {
+                let left = (*left).eval(props);
+                let right = (*right).eval(props);
+                match op {
                     BiOp::If => !left || right,
                     BiOp::Iff => left == right,
                 }
             }
-            Self::UnCon(sub_expr) => match (*sub_expr).0 {
-                UnOp::Not => !(*sub_expr).1.eval(props),
+            Self::MulCon(op, exprs) => match op {
+                MulOp::And => exprs.iter().all(|s| s.eval(&props)),
+                MulOp::Or => exprs.iter().any(|s| s.eval(&props)),
+                MulOp::Xor => exprs.iter().map(|s| match s.eval(&props) {true => 1, false => 0}).sum::<i32>() == 1,
             },
         }
     }
@@ -135,31 +153,35 @@ impl fmt::Display for Expr {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match &self {
             Self::Prop(str) => write!(f, "{}", str),
-            Self::BiCon(sub_expr) => {
-                write!(f, "({} {} {})", (*sub_expr).0, (*sub_expr).1, (*sub_expr).2,)
-            }
-            Self::UnCon(sub_expr) => write!(f, "{}{}", (*sub_expr).0, (*sub_expr).1,),
+            Self::UnCon(op, expr) => write!(f, "{}{}", op, (*expr)),
+            Self::BiCon(left, op, right) => {
+                write!(f, "({} {} {})", (*left), op, (*right))
+            },
+            Self::MulCon(op, exprs) => write!(
+                f,
+                "({})",
+                exprs.iter().map(|s| format!("{}", s)).collect::<Vec<String>>().join(&format!(" {} ", op)),
+            ),
         }
     }
 }
 
 fn main() {
     println!("Hello, world!");
-    let expr1 = Expr::BiCon(Box::new((
-        Expr::Prop("p".to_string()),
-        BiOp::Iff,
-        Expr::Prop("q".to_string()),
-    )));
+    let expr1 = Expr::MulCon(
+        MulOp::Or,
+        vec![Expr::Prop("a".to_string()),Expr::Prop("a".to_string())]
+        );
 
     println!("{}", expr1);
 
     expr1.truth_table();
 
-    let expr2 = Expr::BiCon(Box::new((
-        Expr::Prop("p".to_string()),
+    let expr2 = Expr::BiCon(
+        Box::new(Expr::Prop("a".to_string())),
         BiOp::If,
-        Expr::Prop("q".to_string()),
-    )));
+        Box::new(Expr::Prop("b".to_string())),
+    );
 
     println!("{}", expr2);
 
