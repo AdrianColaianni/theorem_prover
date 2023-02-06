@@ -3,8 +3,8 @@
  *
  */
 
+use colored::Colorize;
 use core::fmt;
-use std::fs::write;
 use dict::{Dict, DictIface};
 
 #[allow(dead_code)]
@@ -37,6 +37,7 @@ impl fmt::Display for MulOp {
     }
 }
 
+#[allow(dead_code)]
 enum BiOp {
     If,
     Iff,
@@ -64,9 +65,7 @@ impl Expr {
         match &self {
             Self::Prop(_) => 1,
             Self::UnCon(_, expr) => (*expr).get_prepositions(),
-            Self::BiCon(left, _, right) => {
-                (*left).get_prepositions() + (*right).get_prepositions()
-            }
+            Self::BiCon(left, _, right) => (*left).get_prepositions() + (*right).get_prepositions(),
             Self::MulCon(_, exprs) => exprs.into_iter().map(|s| s.get_prepositions()).sum(),
         }
     }
@@ -80,9 +79,10 @@ impl Expr {
                 vec.append(&mut vec2);
                 vec
             }
-            Self::MulCon(_, exprs) => {
-                exprs.iter().flat_map(|s| s.get_prepositions_vec()).collect()
-            }
+            Self::MulCon(_, exprs) => exprs
+                .iter()
+                .flat_map(|s| s.get_prepositions_vec())
+                .collect(),
         };
         vec.sort();
         vec.dedup();
@@ -105,7 +105,16 @@ impl Expr {
             Self::MulCon(op, exprs) => match op {
                 MulOp::And => exprs.iter().all(|s| s.eval(&props)),
                 MulOp::Or => exprs.iter().any(|s| s.eval(&props)),
-                MulOp::Xor => exprs.iter().map(|s| match s.eval(&props) {true => 1, false => 0}).sum::<i32>() == 1,
+                MulOp::Xor => {
+                    exprs
+                        .iter()
+                        .map(|s| match s.eval(&props) {
+                            true => 1,
+                            false => 0,
+                        })
+                        .sum::<i32>()
+                        == 1
+                }
             },
         }
     }
@@ -139,8 +148,8 @@ impl Expr {
                 print!(
                     "{} | ",
                     match item {
-                        true => "T",
-                        false => "F",
+                        true => format!("T").green(),
+                        false => format!("F").red(),
                     }
                 );
             }
@@ -156,11 +165,15 @@ impl fmt::Display for Expr {
             Self::UnCon(op, expr) => write!(f, "{}{}", op, (*expr)),
             Self::BiCon(left, op, right) => {
                 write!(f, "({} {} {})", (*left), op, (*right))
-            },
+            }
             Self::MulCon(op, exprs) => write!(
                 f,
                 "({})",
-                exprs.iter().map(|s| format!("{}", s)).collect::<Vec<String>>().join(&format!(" {} ", op)),
+                exprs
+                    .iter()
+                    .map(|s| format!("{}", s))
+                    .collect::<Vec<String>>()
+                    .join(&format!(" {} ", op)),
             ),
         }
     }
@@ -169,18 +182,35 @@ impl fmt::Display for Expr {
 fn main() {
     println!("Hello, world!");
     let expr1 = Expr::MulCon(
-        MulOp::Or,
-        vec![Expr::Prop("a".to_string()),Expr::Prop("a".to_string())]
-        );
+        MulOp::And,
+        vec![
+            Expr::Prop("a".to_string()),
+            Expr::BiCon(
+                Box::new(Expr::UnCon(
+                    UnOp::Not,
+                    Box::new(Expr::Prop("a".to_string())),
+                )),
+                BiOp::If,
+                Box::new(Expr::Prop("b".to_string())),
+                ),
+            Expr::Prop("c".to_string())
+        ],
+    );
 
     println!("{}", expr1);
 
     expr1.truth_table();
 
-    let expr2 = Expr::BiCon(
-        Box::new(Expr::Prop("a".to_string())),
-        BiOp::If,
-        Box::new(Expr::Prop("b".to_string())),
+    let expr2 = Expr::MulCon(
+        MulOp::And,
+        vec![
+            Expr::Prop("a".to_string()),
+            Expr::Prop("b".to_string()),
+            Expr::Prop("c".to_string()),
+            Expr::Prop("d".to_string()),
+            Expr::Prop("e".to_string()),
+            // Expr::Prop("f".to_string()),
+        ]
     );
 
     println!("{}", expr2);
