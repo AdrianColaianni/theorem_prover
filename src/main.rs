@@ -123,18 +123,21 @@ impl Expr {
         let rows = 2_usize.pow(props.len() as u32);
 
         for prop in &props {
-            print!("{} | ", prop);
+            print!(" {}|", prop);
         }
+        println!();
 
         let mut truth_vec: Vec<Vec<bool>> = vec![vec![false; props.len() + 1]; rows as usize];
 
-        println!();
+        // Populate rows w/ true false
         for prop_index in 0..props.len() {
             let magic = 2_usize.pow((props.len() - prop_index) as u32);
             for index in 0..rows {
                 truth_vec[index][prop_index] = index % magic < magic / 2;
             }
         }
+
+        // Eval each row
         for index in 0..rows {
             let mut dict = Dict::<bool>::new();
             for (pi, prop) in props.iter().enumerate() {
@@ -142,16 +145,17 @@ impl Expr {
             }
             truth_vec[index][props.len()] = self.eval(&dict);
         }
-        // println!("{:?}", truth_vec);
+
         for row in truth_vec {
             for item in row {
                 print!(
-                    "{} | ",
+                    "{}",
                     match item {
-                        true => format!("T").green(),
-                        false => format!("F").red(),
+                        true => format!("▇▇").green(),
+                        false => format!("▇▇").red(),
                     }
                 );
+                print!("{}", format!("█").black());
             }
             println!();
         }
@@ -202,7 +206,7 @@ fn main() {
     expr1.truth_table();
 
     let expr2 = Expr::MulCon(
-        MulOp::And,
+        MulOp::Xor,
         vec![
             Expr::Prop("a".to_string()),
             Expr::Prop("b".to_string()),
