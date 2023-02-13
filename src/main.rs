@@ -146,8 +146,20 @@ impl Expr {
             truth_vec[index][props.len()] = self.eval(&dict);
         }
 
-        for row in truth_vec {
-            for item in row {
+        for item in &truth_vec[0] {
+            print!(
+                "{}",
+                match item {
+                    true => format!("▇▇").green(),
+                    false => format!("▇▇").red(),
+                }
+                );
+            print!("{}", format!("▇").black());
+        }
+        println!();
+
+        for row in 1..truth_vec.len() {
+            for item in &truth_vec[row] {
                 print!(
                     "{}",
                     match item {
